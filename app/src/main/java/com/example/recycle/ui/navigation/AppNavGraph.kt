@@ -1,22 +1,34 @@
 package com.example.recycle.ui.navigation
 
-import android.window.SplashScreen
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.recycle.feature.auth.AuthViewModel
 import com.example.recycle.feature.auth.LoginScreen
+import com.example.recycle.feature.auth.RegisterScreen
+import com.example.recycle.feature.auth.SessionState
 import com.example.recycle.feature.auth.SplashScreen
+import com.example.recycle.feature.droppoint.DropPointDetailScreen
+import com.example.recycle.feature.droppoint.DropPointFormScreen
+import com.example.recycle.feature.droppoint.DropPointListScreen
 import com.example.recycle.ui.components.ScreenWithStatusBar
 
 
 // Pemilik: Bersama
 // NavHost: Splash, Auth, Main, dan layar detail/form.
 @Composable
-fun AppNavGraph(){
+fun AppNavGraph(
+    authViewModel: AuthViewModel = viewModel()
+){
     val navController = rememberNavController()
+    val sessionState by authViewModel.sessionState.collectAsState()
+    val authState by authViewModel.authState.collectAsState()
 
     NavHost(
         navController = navController,
@@ -24,8 +36,9 @@ fun AppNavGraph(){
     ){
         composable(route = Routes.splash){
            SplashScreen(
-               onSplashFinished = {
-                   navController.navigate(Routes.login){
+               sessionState = sessionState,
+               onSplashFinished = { isLoggedIn ->
+                   navController.navigate(if (isLoggedIn) Routes.main else Routes.login){
                        popUpTo(Routes.splash){inclusive = true}
                    }
                }
@@ -33,9 +46,100 @@ fun AppNavGraph(){
         }
 
         composable(route = Routes.login) {
-           ScreenWithStatusBar {
-               LoginScreen()
-           }
+            LaunchedEffect(sessionState) {
+                if (sessionState is SessionState.LoggedIn) navController.goToMain()
+            }
+            ScreenWithStatusBar {
+                LoginScreen(
+                    authState = authState,
+                    onLogin = authViewModel::login,
+                    onRegisterClick = {
+                        authViewModel.resetAuthState()
+                        navController.navigate(Routes.register)
+                    }
+                )
+            }
         }
+
+        composable(route = Routes.register) {
+            LaunchedEffect(sessionState) {
+                if (sessionState is SessionState.LoggedIn) navController.goToMain()
+            }
+            ScreenWithStatusBar {
+                RegisterScreen(
+                    authState = authState,
+                    onRegister = authViewModel::register,
+                    onLoginClick = {
+                        authViewModel.resetAuthState()
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
+
+        composable(route = Routes.main) {
+            val session = sessionState
+            LaunchedEffect(session) {
+                if (session is SessionState.LoggedOut) {
+                    navController.navigate(Routes.login) {
+                        popUpTo(Routes.main) { inclusive = true }
+                    }
+                }
+            }
+            if (session is SessionState.LoggedIn) {
+                ScreenWithStatusBar {
+                    MainScreen(session = session, onLogout = authViewModel::logout)
+                }
+            }
+        }
+
+        composable(route = Routes.dropPoints){
+            val session = sessionState
+            LaunchedEffect(session) {
+                if (session is SessionState.LoggedOut) {
+                    navController.navigate(Routes.login) {
+                        popUpTo(Routes.main) { inclusive = true }
+                    }
+                }
+            }
+            ScreenWithStatusBar {
+                DropPointDetailScreen()
+            }
+        }
+
+        composable(route = Routes.dropPoints){
+            val session = sessionState
+            LaunchedEffect(session) {
+                if (session is SessionState.LoggedOut) {
+                    navController.navigate(Routes.login) {
+                        popUpTo(Routes.main) { inclusive = true }
+                    }
+                }
+            }
+            ScreenWithStatusBar {
+                DropPointListScreen()
+            }
+        }
+
+        composable(route = Routes.dropPoints){
+            val session = sessionState
+            LaunchedEffect(session) {
+                if (session is SessionState.LoggedOut) {
+                    navController.navigate(Routes.login) {
+                        popUpTo(Routes.main) { inclusive = true }
+                    }
+                }
+            }
+            ScreenWithStatusBar {
+                DropPointFormScreen()
+            }
+        }
+    }
+}
+
+/** Ke Main dan hapus Login/Register dari back stack agar tombol Back tidak kembali ke sana. */
+private fun NavHostController.goToMain() {
+    navigate(Routes.main) {
+        popUpTo(graph.id) { inclusive = true }
     }
 }
