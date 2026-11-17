@@ -11,6 +11,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -27,10 +31,20 @@ import kotlinx.coroutines.delay
 // Pemilik: Bersama
 // Cek sesi lalu arahkan ke Login atau Main.
 @Composable
-fun SplashScreen(onSplashFinished: () -> Unit = {}){
+fun SplashScreen(
+    sessionState: SessionState = SessionState.Checking,
+    onSplashFinished: (isLoggedIn: Boolean) -> Unit = {}
+){
+    // Tampil minimal 2 detik, lalu tunggu sampai pengecekan sesi selesai.
+    var minDelayDone by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(2000L)
-        onSplashFinished()
+        minDelayDone = true
+    }
+    LaunchedEffect(minDelayDone, sessionState) {
+        if (minDelayDone && sessionState !is SessionState.Checking) {
+            onSplashFinished(sessionState is SessionState.LoggedIn)
+        }
     }
 
     Column(
