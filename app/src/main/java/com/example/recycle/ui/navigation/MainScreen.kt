@@ -24,7 +24,8 @@ import com.example.recycle.ui.theme.TextSecondary
 @Composable
 fun MainScreen(
     session: SessionState.LoggedIn,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onOpenDropPoints: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -38,6 +39,9 @@ fun MainScreen(
         Text(session.email ?: "-", color = TextSecondary)
         Text("Peran: ${session.role}", color = TextSecondary)
         Spacer(Modifier.height(Dimens.Space6))
+        // SEMENTARA: pintu masuk ke layar Lokasi sampai bottom navigation dibuat.
+        OutlinedButton(onClick = onOpenDropPoints) { Text("Lihat Lokasi Setor") }
+        Spacer(Modifier.height(Dimens.Space2))
         OutlinedButton(onClick = onLogout) { Text("Logout") }
     }
 }
