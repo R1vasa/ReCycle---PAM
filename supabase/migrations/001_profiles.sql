@@ -20,6 +20,12 @@ alter table public.profiles add column if not exists email text;
 alter table public.profiles add column if not exists role text not null default 'warga';
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 
+-- Kolom role yang sudah ada sebelumnya (nullable, tanpa default) tidak diubah oleh
+-- "add column if not exists", jadi default & not null dipasang terpisah.
+alter table public.profiles alter column role set default 'warga';
+update public.profiles set role = 'warga' where role is null;
+alter table public.profiles alter column role set not null;
+
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('warga', 'pengelola'));
 

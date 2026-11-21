@@ -1,12 +1,31 @@
 package com.example.recycle.ui.theme
 
+import androidx.compose.ui.text.font.Font
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.recycle.R
 
-val AppFontFamily = FontFamily.Default
+val AppFontFamily = FontFamily(
+    Font(
+        R.font.roboto_reguler,
+        weight = FontWeight.Normal
+    ),
+    Font(
+        R.font.roboto_medium,
+        weight = FontWeight.Medium
+    ),
+    Font(
+        R.font.roboto_semibold,
+        weight = FontWeight.SemiBold
+    ),
+    Font(
+        R.font.roboto_bold,
+        weight = FontWeight.Bold
+    )
+)
 
 val ReCycleTypography = Typography(
     // Display: 32 px, Bold (Headline besar / hero)

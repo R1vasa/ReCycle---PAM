@@ -6,6 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -88,50 +90,56 @@ fun AppNavGraph(
             }
             if (session is SessionState.LoggedIn) {
                 ScreenWithStatusBar {
-                    MainScreen(session = session, onLogout = authViewModel::logout)
+                    MainScreen(
+                        session = session,
+                        onLogout = authViewModel::logout,
+                        onOpenDropPoints = { navController.navigate(Routes.dropPoints) }
+                    )
                 }
             }
         }
 
         composable(route = Routes.dropPoints){
-            val session = sessionState
-            LaunchedEffect(session) {
-                if (session is SessionState.LoggedOut) {
-                    navController.navigate(Routes.login) {
-                        popUpTo(Routes.main) { inclusive = true }
-                    }
+            RedirectWhenLoggedOut(sessionState, navController)
+            DropPointListScreen(
+                onDropPointClick = { dropPoint ->
+                    dropPoint.id?.let { navController.navigate(Routes.dropPointDetail(it)) }
                 }
-            }
+            )
+        }
+
+        composable(
+            route = Routes.dropPointDetail,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ){
+            RedirectWhenLoggedOut(sessionState, navController)
+            val dropPointId = it.arguments?.getString("id").orEmpty()
+            // ambil dengan it.arguments?.getString("id").
             ScreenWithStatusBar {
-                DropPointDetailScreen()
+                DropPointDetailScreen(dropPointId = dropPointId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEdit = { id ->
+                        navController.navigate(Routes.dropPointForm)
+                    })
             }
         }
 
-        composable(route = Routes.dropPoints){
-            val session = sessionState
-            LaunchedEffect(session) {
-                if (session is SessionState.LoggedOut) {
-                    navController.navigate(Routes.login) {
-                        popUpTo(Routes.main) { inclusive = true }
-                    }
-                }
-            }
-            ScreenWithStatusBar {
-                DropPointListScreen()
-            }
-        }
-
-        composable(route = Routes.dropPoints){
-            val session = sessionState
-            LaunchedEffect(session) {
-                if (session is SessionState.LoggedOut) {
-                    navController.navigate(Routes.login) {
-                        popUpTo(Routes.main) { inclusive = true }
-                    }
-                }
-            }
+        composable(route = Routes.dropPointForm){
+            RedirectWhenLoggedOut(sessionState, navController)
             ScreenWithStatusBar {
                 DropPointFormScreen()
+            }
+        }
+    }
+}
+
+/** Jika pengguna logout, kembali ke Login dan kosongkan back stack. */
+@Composable
+private fun RedirectWhenLoggedOut(sessionState: SessionState, navController: NavHostController) {
+    LaunchedEffect(sessionState) {
+        if (sessionState is SessionState.LoggedOut) {
+            navController.navigate(Routes.login) {
+                popUpTo(navController.graph.id) { inclusive = true }
             }
         }
     }

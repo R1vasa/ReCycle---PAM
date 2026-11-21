@@ -30,4 +30,5 @@ interface DropPointApiService {
     suspend fun deleteDropPoints(
         @Query("id") idFilter: String
     ): Response<Unit>
+
 }
