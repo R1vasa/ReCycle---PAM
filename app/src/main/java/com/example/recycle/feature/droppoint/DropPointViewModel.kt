@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.recycle.core.data.model.DropPoint
+import com.example.recycle.core.util.UiState
 import com.example.recycle.feature.droppoint.DropPointRepository
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -36,6 +37,9 @@ class DropPointViewModel(
     var userLatitude by mutableStateOf<Double?>(null)
         private set
     var userLongitude by mutableStateOf<Double?>(null)
+        private set
+
+    var saveState by mutableStateOf<UiState<DropPoint>>(UiState.Idle)
         private set
 
     // State Loading & Error
@@ -143,6 +147,56 @@ class DropPointViewModel(
             totalMenitSekarang in totalMenitBuka until totalMenitTutup
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun resetSaveState() {
+        saveState = UiState.Idle
+    }
+
+    fun tambahLokasi(dropPoint: DropPoint) {
+        viewModelScope.launch {
+            saveState = UiState.Loading
+
+            repository.addDaftarLokasi(dropPoint)
+                .onSuccess { newLocation ->
+                    saveState = UiState.Success(newLocation)
+                    // Refresh daftar lokasi agar item baru langsung muncul di list
+                    fetchDaftarLokasi()
+                }
+                .onFailure { exception ->
+                    saveState = UiState.Error(exception.message ?: "Terjadi kesalahan")
+                }
+        }
+    }
+
+    fun updateLokasi(id: String, dropPoint: DropPoint) {
+        viewModelScope.launch {
+            saveState = UiState.Loading
+            repository.updateLokasi(id, dropPoint)
+                .onSuccess { updated ->
+                    saveState = UiState.Success(updated)
+                    fetchDaftarLokasi() // Refresh data list
+                }
+                .onFailure { exception ->
+                    saveState = UiState.Error(exception.message ?: "Gagal update lokasi")
+                }
+        }
+    }
+
+    fun hapusLokasi(id: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            isLoading = true
+            repository.deleteLokasi(id)
+                .onSuccess {
+                    fetchDaftarLokasi() // Refresh list setelah dihapus
+                    isLoading = false
+                    onSuccess()
+                }
+                .onFailure { exception ->
+                    isLoading = false
+                    errorMessage = exception.message ?: "Gagal menghapus lokasi"
+                }
         }
     }
 

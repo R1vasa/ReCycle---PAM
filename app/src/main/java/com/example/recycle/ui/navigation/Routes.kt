@@ -15,4 +15,5 @@ object Routes{
 
     /** id berupa uuid (String), sesuai kolom drop_points.id. */
     fun dropPointDetail(id: String) = "drop_points/detail/$id"
+    fun dropPointEdit(id: String) = "drop_points/form?id=$id"
 }

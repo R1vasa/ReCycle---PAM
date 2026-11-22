@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.WineBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +72,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.recycle.core.data.model.DropPoint
+import com.example.recycle.core.data.remote.SupabaseProvider
+import com.example.recycle.core.util.UiState
 import com.example.recycle.ui.theme.Dimens
 import com.example.recycle.ui.theme.OutlineLight
 import com.example.recycle.ui.theme.Primary800
@@ -97,29 +103,121 @@ private val DAFTAR_KATEGORI_SAMPAH = listOf(
     KategoriSampahOption("minyak", "Minyak", Icons.Outlined.Opacity)
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DropPointFormScreen(
+    dropPointId: String? = null,
     onNavigateBack: () -> Unit = {},
-    onSaveSuccess: () -> Unit = {}
-) {
-    // State form
-    var namaLokasi by remember { mutableStateOf("") }
-    var alamatLengkap by remember { mutableStateOf("") }
-    var kecamatan by remember { mutableStateOf("") }
-    var nomorTelepon by remember { mutableStateOf("") }
+    onSaveSuccess: () -> Unit = {},
+    viewModel: DropPointViewModel = viewModel(
+        factory = DropPointViewModel.provideFactory(
+            DropPointRepository(SupabaseProvider.dropPointService)
+        )
+    )
+){
+    val saveState = viewModel.saveState
 
-    // Hari operasional (default terpilih Senin s/d Jumat sesuai desain)
-    val selectedHari = remember {
-        mutableStateListOf("Sen", "Sel", "Rab", "Kam", "Jum")
+    // Ambil data lama jika dalam mode edit
+    val existingDropPoint = remember(dropPointId, viewModel.daftarLokasi) {
+        if (dropPointId != null) {
+            viewModel.daftarLokasi.find { it.id == dropPointId }
+        } else null
     }
 
-    var jamBuka by remember { mutableStateOf("") }
-    var jamTutup by remember { mutableStateOf("") }
+    LaunchedEffect(saveState) {
+        if (saveState is UiState.Success) {
+            viewModel.resetSaveState()
+            onSaveSuccess()
+        }
+    }
 
-    // Sampah yang diterima
-    val selectedSampah = remember {
-        mutableStateListOf<String>()
+    DropPointFormContent(
+        initialDropPoint = existingDropPoint,
+        isLoading = saveState is UiState.Loading,
+        errorMessage = (saveState as? UiState.Error)?.message,
+        onBackClick = onNavigateBack,
+        onSaveClick = { dropPointData ->
+            if (dropPointId != null) {
+                // Mode Edit: update lokasi lama
+                viewModel.updateLokasi(dropPointId, dropPointData)
+            } else {
+                // Mode Tambah: buat lokasi baru
+                viewModel.tambahLokasi(dropPointData)
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun DropPointFormContent(
+    initialDropPoint: DropPoint? = null,
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
+    onBackClick: () -> Unit = {},
+    onSaveClick: (DropPoint) -> Unit = {}
+) {
+    val isEditMode = initialDropPoint != null
+
+    // 1. Ekstrak Alamat & Kecamatan
+    val (initialAlamat, initialKecamatan) = remember(initialDropPoint) {
+        val addr = initialDropPoint?.address.orEmpty()
+        if (addr.contains(", Kec. ")) {
+            val parts = addr.split(", Kec. ")
+            Pair(parts[0], parts.getOrNull(1).orEmpty())
+        } else {
+            Pair(addr, "")
+        }
+    }
+
+    // 2. Ekstrak Hari Operasional
+    val initialHari = remember(initialDropPoint) {
+        if (initialDropPoint != null && initialDropPoint.operatingHours.isNotBlank()) {
+            val active = DAFTAR_HARI.filter { initialDropPoint.operatingHours.contains(it) }
+            if (active.isNotEmpty()) active else listOf("Sen", "Sel", "Rab", "Kam", "Jum")
+        } else {
+            listOf("Sen", "Sel", "Rab", "Kam", "Jum")
+        }
+    }
+
+    // 3. Ekstrak Jam Buka & Tutup (misal format: 08.00 - 15.00)
+    val (initialJamBuka, initialJamTutup) = remember(initialDropPoint) {
+        if (initialDropPoint != null) {
+            val regex = """(\d{1,2}[:.]\d{2})\s*-\s*(\d{1,2}[:.]\d{2})""".toRegex()
+            val match = regex.find(initialDropPoint.operatingHours)
+            if (match != null) {
+                Pair(match.groupValues[1], match.groupValues[2])
+            } else {
+                Pair("", "")
+            }
+        } else {
+            Pair("", "")
+        }
+    }
+
+    // 4. Ekstrak Sampah yang Diterima
+    val initialSampah = remember(initialDropPoint) {
+        if (initialDropPoint != null && initialDropPoint.acceptedWaste.isNotBlank()) {
+            initialDropPoint.acceptedWaste.split(",").map { it.trim() }
+        } else {
+            emptyList()
+        }
+    }
+
+    // State form terisi otomatis jika edit mode
+    var namaLokasi by remember(initialDropPoint) { mutableStateOf(initialDropPoint?.name.orEmpty()) }
+    var alamatLengkap by remember(initialDropPoint) { mutableStateOf(initialAlamat) }
+    var kecamatan by remember(initialDropPoint) { mutableStateOf(initialKecamatan) }
+    var nomorTelepon by remember(initialDropPoint) { mutableStateOf(initialDropPoint?.contactPhone.orEmpty()) }
+
+    val selectedHari = remember(initialDropPoint) {
+        mutableStateListOf<String>().apply { addAll(initialHari) }
+    }
+
+    var jamBuka by remember(initialDropPoint) { mutableStateOf(initialJamBuka) }
+    var jamTutup by remember(initialDropPoint) { mutableStateOf(initialJamTutup) }
+
+    val selectedSampah = remember(initialDropPoint) {
+        mutableStateListOf<String>().apply { addAll(initialSampah) }
     }
 
     Scaffold(
@@ -127,14 +225,14 @@ fun DropPointFormScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "Tambah Lokasi",
+                        text = if (isEditMode) "Edit Lokasi" else "Tambah Lokasi",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Tutup",
@@ -161,7 +259,7 @@ fun DropPointFormScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedButton(
-                            onClick = onNavigateBack,
+                            onClick = onBackClick,
                             shape = RoundedCornerShape(50),
                             border = BorderStroke(1.dp, OutlineLight),
                             modifier = Modifier
@@ -177,7 +275,6 @@ fun DropPointFormScreen(
 
                         Button(
                             onClick = {
-                                // Format operatingHours dari selectedHari + jam
                                 val hariStr = selectedHari.joinToString(", ")
                                 val operatingHours = "$hariStr $jamBuka - $jamTutup".trim()
                                 val acceptedWaste = selectedSampah.joinToString(", ")
@@ -187,27 +284,53 @@ fun DropPointFormScreen(
                                     alamatLengkap
                                 }
 
-                                // TODO: Panggil ViewModel.createDropPoint(...)
-                                onSaveSuccess()
+                                if (namaLokasi.isBlank()) {
+                                    return@Button
+                                }
+
+                                if (alamatLengkap.isBlank()) {
+                                    return@Button
+                                }
+
+                                val dropPointData = DropPoint(
+                                    id = initialDropPoint?.id,
+                                    name = namaLokasi,
+                                    address = fullAddress,
+                                    operatingHours = operatingHours,
+                                    acceptedWaste = acceptedWaste,
+                                    contactPhone = nomorTelepon,
+                                    latitude = initialDropPoint?.latitude,
+                                    longitude = initialDropPoint?.longitude
+                                )
+                                onSaveClick(dropPointData)
                             },
+                            enabled = !isLoading,
                             shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.buttonColors(containerColor = Primary800),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Save,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Simpan",
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.Save,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isEditMode) "Simpan Perubahan" else "Simpan",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -481,6 +604,6 @@ private fun WasteCategoryChip(
 @Composable
 fun PreviewDropPointFormScreen() {
     ReCycleTheme {
-        DropPointFormScreen()
+        DropPointFormContent()
     }
 }
