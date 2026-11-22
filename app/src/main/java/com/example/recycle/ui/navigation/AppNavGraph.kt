@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.recycle.core.data.model.Profile
 import com.example.recycle.feature.auth.AuthViewModel
 import com.example.recycle.feature.auth.LoginScreen
 import com.example.recycle.feature.auth.RegisterScreen
@@ -31,6 +32,7 @@ fun AppNavGraph(
     val navController = rememberNavController()
     val sessionState by authViewModel.sessionState.collectAsState()
     val authState by authViewModel.authState.collectAsState()
+    val isPengelola = (sessionState as? SessionState.LoggedIn)?.role == Profile.ROLE_PENGELOLA
 
     NavHost(
         navController = navController,
@@ -102,8 +104,11 @@ fun AppNavGraph(
         composable(route = Routes.dropPoints){
             RedirectWhenLoggedOut(sessionState, navController)
             DropPointListScreen(
+                isPengelola = isPengelola,
                 onDropPointClick = { dropPoint ->
                     dropPoint.id?.let { navController.navigate(Routes.dropPointDetail(it)) }
+                },
+                onNavigateToAdd = {navController.navigate((Routes.dropPointForm))
                 }
             )
         }
@@ -114,20 +119,36 @@ fun AppNavGraph(
         ){
             RedirectWhenLoggedOut(sessionState, navController)
             val dropPointId = it.arguments?.getString("id").orEmpty()
-            // ambil dengan it.arguments?.getString("id").
             ScreenWithStatusBar {
-                DropPointDetailScreen(dropPointId = dropPointId,
+                DropPointDetailScreen(
+                    dropPointId = dropPointId,
+                    isPengelola = isPengelola,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToEdit = { id ->
-                        navController.navigate(Routes.dropPointForm)
-                    })
+                        navController.navigate(Routes.dropPointEdit(id))
+                    }
+                )
             }
         }
 
-        composable(route = Routes.dropPointForm){
+        composable(
+            route = "drop_points/form?id={id}",
+            arguments = listOf(
+                navArgument("id") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ){ backStackEntry ->
             RedirectWhenLoggedOut(sessionState, navController)
+            val editId = backStackEntry.arguments?.getString("id")
             ScreenWithStatusBar {
-                DropPointFormScreen()
+                DropPointFormScreen(
+                    dropPointId = editId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onSaveSuccess = { navController.popBackStack() }
+                )
             }
         }
     }

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.WineBar
 import androidx.compose.material.icons.rounded.Recycling
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,6 +56,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,6 +99,7 @@ data class SampahItem(
 fun DropPointDetailScreen(
     dropPointId: String = "", // Tipe String karena UUID dari Supabase
     onNavigateBack: () -> Unit = {},
+    isPengelola: Boolean = false,
     onNavigateToEdit: (String) -> Unit = {},
     viewModel: DropPointViewModel = viewModel(
         factory = DropPointViewModel.provideFactory(
@@ -134,11 +140,52 @@ fun DropPointDetailScreen(
 
             // Kasus C: Data ada! Teruskan objeknya ke Content
             else -> {
+                var showDeleteDialog by remember { mutableStateOf(false) }
+
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = {
+                            Text(
+                                text = "Hapus Lokasi?",
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = "Apakah Anda yakin ingin menghapus '${selectedDropPoint.name}'? Tindakan ini tidak dapat dibatalkan."
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showDeleteDialog = false
+                                    selectedDropPoint.id?.let { id ->
+                                        viewModel.hapusLokasi(id) {
+                                            onNavigateBack()
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFB3261E)
+                                )
+                            ) {
+                                Text("Hapus", color = Color.White)
+                            }
+                        },
+                        dismissButton = {
+                            OutlinedButton(onClick = { showDeleteDialog = false }) {
+                                Text("Batal")
+                            }
+                        }
+                    )
+                }
+
                 DropPointDetailContent(
                     dropPoint = selectedDropPoint,
                     onBackClick = onNavigateBack,
-                    onEditClick = {onNavigateToEdit(dropPointId)},
-                    onDeleteClick = {},
+                    onEditClick = { onNavigateToEdit(dropPointId) },
+                    onDeleteClick = { showDeleteDialog = true },
                     onTeleponClick = {
                         if (selectedDropPoint.contactPhone.isNotBlank()) {
                             val dialIntent = Intent(Intent.ACTION_DIAL).apply {
@@ -186,7 +233,8 @@ fun DropPointDetailScreen(
                             context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
                         }
                     },
-                    isOpen = viewModel.isSedangBuka(selectedDropPoint.operatingHours)
+                    isOpen = viewModel.isSedangBuka(selectedDropPoint.operatingHours),
+                    isPengelola = isPengelola
                 )
             }
         }
@@ -203,7 +251,8 @@ fun DropPointDetailContent(
     onShareClick: () -> Unit = {},
     onSampahItemClick: (SampahItem) -> Unit = {},
     isOpen: Boolean,
-    dropPoint: DropPoint
+    dropPoint: DropPoint,
+    isPengelola: Boolean = false
 ) {
 
     val daftarSampah = listOf(
@@ -233,19 +282,21 @@ fun DropPointDetailContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditClick) {
-                        Icon(
-                            imageVector = Icons.Outlined.Edit,
-                            contentDescription = "Edit Lokasi",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = onDeleteClick) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = "Hapus Lokasi",
-                            modifier = Modifier.size(24.dp)
-                        )
+                    if (isPengelola){
+                        IconButton(onClick = onEditClick) {
+                            Icon(
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = "Edit Lokasi",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = onDeleteClick) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = "Hapus Lokasi",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             )

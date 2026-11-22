@@ -13,12 +13,6 @@ import okhttp3.Route
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-/**
- * Menambahkan header Supabase ke setiap request.
- * - apikey selalu publishable key.
- * - Authorization memakai access_token pengguna bila sudah login, agar RLS mengenali auth.uid().
- *   Sebelum login (atau untuk endpoint auth) memakai publishable key.
- */
 class ApiKeyInterceptor(
     private val apiKey: String,
     private val useUserToken: Boolean = true
